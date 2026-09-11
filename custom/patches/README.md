@@ -1,11 +1,3 @@
-# Source patches
+# 源码补丁
 
-Place reproducible source changes here as `*.patch` files. Patches are applied
-in filename order before feeds are updated. Prefix filenames with numbers, for
-example `010-change-branding.patch`.
-
-Generate a patch from a clean FanchmWrt checkout with:
-
-```bash
-git diff > 010-my-change.patch
-```
+存放 `*.patch` 文件，构建时在更新 feeds 前按文件名顺序应用。建议使用数字前缀，例如 `010-custom-defaults.patch`。

@@ -1,12 +1,3 @@
-# Root filesystem overlay
+# 固件文件
 
-Files placed here are copied into the firmware root filesystem. The directory
-layout must start at `/`; for example:
-
-```text
-custom/files/etc/banner
-custom/files/etc/uci-defaults/90-my-settings
-```
-
-Use an executable `/etc/uci-defaults/` script for settings that should be
-applied once on the first boot.
+按固件根目录结构放置文件，例如 `etc/banner`。构建时复制到固件；首次启动设置可使用 `etc/uci-defaults/` 下的可执行脚本。不要放入密码或私钥。

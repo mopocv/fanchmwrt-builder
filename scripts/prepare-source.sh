@@ -9,7 +9,7 @@ builder_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
   exit 1
 }
 
-# Use the feed revisions from the previous successful build.
+# Apply the pinned base feeds.
 if [[ -f "$builder_dir/custom/feeds.conf.default" ]]; then
   cp "$builder_dir/custom/feeds.conf.default" "$source_dir/feeds.conf.default"
 fi

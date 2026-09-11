@@ -1,0 +1,5 @@
+# Add third-party OpenWrt feeds here, one per line.
+# Pin a branch or commit when the feed supports it so future builds stay reproducible.
+#
+# Example:
+# src-git mypackages https://github.com/your-name/openwrt-packages.git;main

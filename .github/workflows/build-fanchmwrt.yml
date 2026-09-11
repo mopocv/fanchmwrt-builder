@@ -1,0 +1,230 @@
+name: Build FanchmWrt
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: "FanchmWrt branch or tag"
+        required: true
+        default: "fanchmwrt-25.12.4"
+        type: string
+      config_path:
+        description: "Config path in this repository"
+        required: true
+        default: "configs/.config"
+        type: string
+      build_name:
+        description: "Artifact name (letters, numbers, dot, dash, underscore)"
+        required: true
+        default: "fanchmwrt"
+        type: string
+      hostname:
+        description: "Default hostname; empty keeps upstream default"
+        required: false
+        default: "FanchmWrt"
+        type: string
+      lan_ip:
+        description: "Default LAN IPv4 address; empty keeps upstream default"
+        required: false
+        default: ""
+        type: string
+      publish_release:
+        description: "Publish firmware as a GitHub Release"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fanchmwrt-${{ github.ref }}-${{ inputs.build_name }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360
+    env:
+      SOURCE_URL: https://github.com/fanchmwrt/fanchmwrt.git
+      SOURCE_DIR: ${{ github.workspace }}/openwrt
+      OUTPUT_DIR: ${{ github.workspace }}/output
+      CONFIG_PATH: ${{ inputs.config_path }}
+      SOURCE_REF: ${{ inputs.source_ref }}
+      BUILD_NAME: ${{ inputs.build_name }}
+      CUSTOM_HOSTNAME: ${{ inputs.hostname }}
+      CUSTOM_LAN_IP: ${{ inputs.lan_ip }}
+      CUSTOM_TIMEZONE: CST-8
+      CUSTOM_ZONENAME: Asia/Shanghai
+      TZ: Asia/Shanghai
+
+    steps:
+      - name: Checkout builder repository
+        uses: actions/checkout@v4
+
+      - name: Validate inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$BUILD_NAME" in
+            (*[!A-Za-z0-9._-]*|'')
+              echo "build_name contains unsupported characters: $BUILD_NAME" >&2
+              exit 1
+              ;;
+          esac
+
+          config_real="$(realpath -m "$GITHUB_WORKSPACE/$CONFIG_PATH")"
+          case "$config_real" in
+            ("$GITHUB_WORKSPACE"/*) ;;
+            (*)
+              echo "config_path must stay inside this repository" >&2
+              exit 1
+              ;;
+          esac
+
+          if [[ ! -f "$config_real" ]]; then
+            echo "Configuration file not found: $CONFIG_PATH" >&2
+            echo "Upload your local .config into configs/ and run the workflow again." >&2
+            exit 1
+          fi
+          echo "CONFIG_REAL=$config_real" >> "$GITHUB_ENV"
+
+      - name: Free runner disk space
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+          sudo docker image prune --all --force || true
+          df -h
+
+      - name: Install build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            ack antlr3 asciidoc autoconf automake autopoint binutils bison \
+            build-essential bzip2 ccache cmake curl device-tree-compiler \
+            fastjar flex gawk gettext gcc-multilib g++-multilib git gperf \
+            haveged help2man intltool libc6-dev-i386 libelf-dev libglib2.0-dev \
+            libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev \
+            libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool \
+            lrzsz mkisofs msmtp nano ninja-build p7zip p7zip-full patch pkgconf \
+            python3 python3-pyelftools python3-setuptools qemu-utils rsync scons \
+            squashfs-tools subversion swig texinfo uglifyjs unzip wget xmlto \
+            xxd zlib1g-dev
+          sudo apt-get clean
+
+      - name: Clone FanchmWrt source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --single-branch --branch "$SOURCE_REF" \
+            "$SOURCE_URL" "$SOURCE_DIR"
+          git -C "$SOURCE_DIR" log -1 --oneline
+
+      - name: Restore download cache
+        uses: actions/cache@v4
+        with:
+          path: openwrt/dl
+          key: fanchmwrt-dl-${{ runner.os }}-${{ inputs.source_ref }}-${{ hashFiles('custom/feeds.conf.append', 'custom/packages/**', 'custom/patches/**') }}
+          restore-keys: |
+            fanchmwrt-dl-${{ runner.os }}-${{ inputs.source_ref }}-
+            fanchmwrt-dl-${{ runner.os }}-
+
+      - name: Apply custom feeds, packages, patches, and defaults
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/prepare-source.sh "$SOURCE_DIR"
+          bash scripts/customize-defaults.sh "$SOURCE_DIR"
+
+      - name: Update and install feeds
+        working-directory: ${{ env.SOURCE_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Load configuration
+        working-directory: ${{ env.SOURCE_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "$CONFIG_REAL" .config
+          make defconfig
+          mkdir -p "$GITHUB_WORKSPACE/build-info"
+          cp .config "$GITHUB_WORKSPACE/build-info/final.config"
+          ./scripts/diffconfig.sh > "$GITHUB_WORKSPACE/build-info/diffconfig.txt"
+          cp feeds.conf.default "$GITHUB_WORKSPACE/build-info/feeds.conf.default"
+
+      - name: Download source archives
+        working-directory: ${{ env.SOURCE_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            make download -j8 && exit 0
+            echo "Download attempt $attempt failed; removing incomplete files before retry."
+            find dl -type f -size -1024c -delete || true
+          done
+          exit 1
+
+      - name: Compile firmware
+        working-directory: ${{ env.SOURCE_DIR }}
+        shell: bash
+        run: |
+          set -o pipefail
+          make -j"$(nproc)" || make -j1 V=s
+
+      - name: Collect firmware and build information
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$OUTPUT_DIR/firmware" "$OUTPUT_DIR/build-info"
+          rsync -a --prune-empty-dirs \
+            --include='*/' \
+            --include='*.bin' --include='*.img' --include='*.img.gz' \
+            --include='*.iso' --include='*.itb' --include='*.manifest' \
+            --include='*.json' --include='sha256sums' \
+            --exclude='*' \
+            "$SOURCE_DIR/bin/targets/" "$OUTPUT_DIR/firmware/"
+          cp -a "$GITHUB_WORKSPACE/build-info/." "$OUTPUT_DIR/build-info/"
+          git -C "$SOURCE_DIR" rev-parse HEAD > "$OUTPUT_DIR/build-info/source-commit.txt"
+          printf '%s\n' "$SOURCE_REF" > "$OUTPUT_DIR/build-info/source-ref.txt"
+          printf '%s\n' "$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            > "$OUTPUT_DIR/build-info/workflow-run.txt"
+
+          if ! find "$OUTPUT_DIR/firmware" -type f -print -quit | grep -q .; then
+            echo "Build completed but no firmware files were found under bin/targets." >&2
+            exit 1
+          fi
+
+          archive="$GITHUB_WORKSPACE/${BUILD_NAME}-${GITHUB_RUN_NUMBER}.tar.gz"
+          tar -C "$OUTPUT_DIR" -czf "$archive" .
+          sha256sum "$archive" > "$archive.sha256"
+          echo "ARCHIVE=$archive" >> "$GITHUB_ENV"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.build_name }}-${{ github.run_number }}
+          path: |
+            ${{ env.ARCHIVE }}
+            ${{ env.ARCHIVE }}.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        if: ${{ inputs.publish_release }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="build-$(date +'%Y%m%d-%H%M')-${GITHUB_RUN_NUMBER}"
+          gh release create "$tag" "$ARCHIVE" "$ARCHIVE.sha256" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$BUILD_NAME $tag" \
+            --notes "FanchmWrt source ref: $SOURCE_REF"

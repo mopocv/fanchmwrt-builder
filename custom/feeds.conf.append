@@ -3,3 +3,6 @@
 #
 # Example:
 # src-git mypackages https://github.com/your-name/openwrt-packages.git;main
+
+# Temperature status 0.8.1, including translations.
+src-git temp_status https://github.com/gSpotx2f/luci-app-temp-status.git^7c47517c1cd3d1ccf52eda9237279a45d5884e34

@@ -1,0 +1,9 @@
+src-git packages https://git.openwrt.org/feed/packages.git^f91b06b3faff7ad3c8cbeb1ab39cef680d2f28ed
+src-git luci https://git.openwrt.org/project/luci.git^e9ebca7598ce2f754b76267fd66bf2b85e6e4347
+src-git routing https://git.openwrt.org/feed/routing.git^b2097c85bef85251364f59a6b2a3ed1f9f5c0c21
+src-git telephony https://git.openwrt.org/feed/telephony.git^2618106d5846a4a542fdf5809f0d3ed228ce439b
+src-git video https://github.com/openwrt/video.git^094bf58da6682f895255a35a84349a79dab4bf95
+src-git fanchmwrt https://github.com/fanchmwrt/fanchmwrt-packages.git^fdfa9a6f8e02ab9ad10e2961271ba9a4fa872458
+src-git r86sglobal https://github.com/R86S/R86S-QuickInstaller.git^e8c14bfe2c4f965ba98507d1d7e27c669b6ce5b6
+src-git lucky https://github.com/gdy666/luci-app-lucky.git^c1730565c6df4ab30d345cf73584f03f5cc7bc8f
+src-git nikki https://github.com/nikkinikki-org/OpenWrt-nikki.git^388f34e5c7749ea9bc2d2068dafb569014ee32e7

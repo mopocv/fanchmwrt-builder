@@ -9,6 +9,11 @@ builder_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
   exit 1
 }
 
+# Use the feed revisions from the previous successful build.
+if [[ -f "$builder_dir/custom/feeds.conf.default" ]]; then
+  cp "$builder_dir/custom/feeds.conf.default" "$source_dir/feeds.conf.default"
+fi
+
 feeds_append="$builder_dir/custom/feeds.conf.append"
 if [[ -s "$feeds_append" ]]; then
   printf '\n# Custom feeds managed by fanchmwrt-builder\n' \

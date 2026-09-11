@@ -7,14 +7,12 @@
 
 ## 第一次构建
 
-1. 在本地 FanchmWrt 源码目录运行 `make menuconfig` 完成选择。
-2. 推荐运行 `./scripts/diffconfig.sh > x86_64.config` 得到精简配置；也可直接使用完整 `.config`。
-3. 打开本仓库的 `configs` 目录，选择 **Add file → Upload files**，上传配置并提交。
-4. 打开 **Actions → Build FanchmWrt → Run workflow**。
-5. 将 `config_path` 填为 `configs/x86_64.config`，按需设置源码分支、主机名和 LAN IP，然后运行。
-6. 构建成功后，从该次运行的 **Artifacts** 下载压缩包；若启用 `publish_release`，也会创建长期保留的 Release。
+1. 本仓库已导入上次成功构建的 `configs/x86_64.config` 和九个 feed 的固定版本。
+2. 按 [环境与 Secrets 说明](docs/local-build-environment.md) 配置私有 LAN 地址及可选密码哈希。
+3. 打开 **Actions → Build FanchmWrt → Run workflow**，默认配置已可使用。
+4. 构建成功后下载 Artifacts；需要发布 Release 时再开启 `publish_release`。
 
-> GitHub Actions 的 `workflow_dispatch` 页面不支持文件类型输入，因此需要先把本地配置上传到 `configs/`，再填写仓库内路径。
+其他设备可新增 `configs/*.config`，在运行时选择对应路径。原本地环境助手与迁移限制见上述说明。
 
 ## 自定义插件
 
@@ -29,7 +27,7 @@
 ## 修改默认配置
 
 - 软件包、内核和目标设备选择：放在 `configs/*.config`。
-- 默认主机名、LAN IP：运行工作流时填写输入项；脚本会生成首次启动时执行的 UCI 配置。
+- 默认主机名：运行工作流时填写输入项；LAN IP：使用 `FANCHMWRT_LAN_IP` Secret；脚本会生成首次启动时执行的 UCI 配置。
 - 固件内固定文件：按根目录结构放入 `custom/files/`。
 - 对上游源码的修改：优先保存为补丁放入 `custom/patches/`。
 - 更复杂、需要条件判断的改动：写入 `scripts/customize-defaults.sh` 或新建脚本并由工作流调用。

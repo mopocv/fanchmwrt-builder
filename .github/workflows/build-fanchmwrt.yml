@@ -11,22 +11,17 @@ on:
       config_path:
         description: "Config path in this repository"
         required: true
-        default: "configs/.config"
+        default: "configs/x86_64.config"
         type: string
       build_name:
         description: "Artifact name (letters, numbers, dot, dash, underscore)"
         required: true
-        default: "fanchmwrt"
+        default: "fanchmwrt-r86s"
         type: string
       hostname:
         description: "Default hostname; empty keeps upstream default"
         required: false
         default: "FanchmWrt"
-        type: string
-      lan_ip:
-        description: "Default LAN IPv4 address; empty keeps upstream default"
-        required: false
-        default: ""
         type: string
       publish_release:
         description: "Publish firmware as a GitHub Release"
@@ -53,7 +48,6 @@ jobs:
       SOURCE_REF: ${{ inputs.source_ref }}
       BUILD_NAME: ${{ inputs.build_name }}
       CUSTOM_HOSTNAME: ${{ inputs.hostname }}
-      CUSTOM_LAN_IP: ${{ inputs.lan_ip }}
       CUSTOM_TIMEZONE: CST-8
       CUSTOM_ZONENAME: Asia/Shanghai
       TZ: Asia/Shanghai
@@ -110,7 +104,7 @@ jobs:
             libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev \
             libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool \
             lrzsz mkisofs msmtp nano ninja-build p7zip p7zip-full patch pkgconf \
-            python3 python3-pyelftools python3-setuptools qemu-utils rsync scons \
+            openssl python3 python3-pyelftools python3-setuptools qemu-utils rsync scons \
             squashfs-tools subversion swig texinfo uglifyjs unzip wget xmlto \
             xxd zlib1g-dev
           sudo apt-get clean
@@ -127,12 +121,16 @@ jobs:
         uses: actions/cache@v4
         with:
           path: openwrt/dl
-          key: fanchmwrt-dl-${{ runner.os }}-${{ inputs.source_ref }}-${{ hashFiles('custom/feeds.conf.append', 'custom/packages/**', 'custom/patches/**') }}
+          key: fanchmwrt-dl-${{ runner.os }}-${{ inputs.source_ref }}-${{ hashFiles('custom/feeds.conf.default', 'custom/feeds.conf.append', 'custom/packages/**', 'custom/patches/**') }}
           restore-keys: |
             fanchmwrt-dl-${{ runner.os }}-${{ inputs.source_ref }}-
             fanchmwrt-dl-${{ runner.os }}-
 
       - name: Apply custom feeds, packages, patches, and defaults
+        env:
+          CUSTOM_LAN_IP: ${{ secrets.FANCHMWRT_LAN_IP }}
+          CUSTOM_ROOT_PASSWORD: ${{ secrets.FANCHMWRT_ROOT_PASSWORD }}
+          CUSTOM_ROOT_PASSWORD_HASH: ${{ secrets.FANCHMWRT_ROOT_PASSWORD_HASH }}
         shell: bash
         run: |
           set -euo pipefail
@@ -148,11 +146,17 @@ jobs:
           ./scripts/feeds install -a
 
       - name: Load configuration
+        env:
+          SET_ROOT_PASSWORD: ${{ secrets.FANCHMWRT_ROOT_PASSWORD != '' || secrets.FANCHMWRT_ROOT_PASSWORD_HASH != '' }}
         working-directory: ${{ env.SOURCE_DIR }}
         shell: bash
         run: |
           set -euo pipefail
           cp "$CONFIG_REAL" .config
+          if [[ "$SET_ROOT_PASSWORD" == true ]]; then
+            sed -i -E '/^(CONFIG_BUSYBOX_CUSTOM=|# CONFIG_BUSYBOX_CUSTOM is not set|CONFIG_BUSYBOX_CONFIG_CHPASSWD=|# CONFIG_BUSYBOX_CONFIG_CHPASSWD is not set)/d' .config
+            printf '\nCONFIG_BUSYBOX_CUSTOM=y\nCONFIG_BUSYBOX_CONFIG_CHPASSWD=y\n' >> .config
+          fi
           make defconfig
           mkdir -p "$GITHUB_WORKSPACE/build-info"
           cp .config "$GITHUB_WORKSPACE/build-info/final.config"

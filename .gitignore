@@ -9,3 +9,10 @@
 !.github/
 !configs/
 !configs/**
+
+# Local private settings and build disks
+.env
+.env.*
+*.sparsebundle/
+.DS_Store
+/private/

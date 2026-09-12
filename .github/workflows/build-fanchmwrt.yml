@@ -54,7 +54,7 @@ jobs:
 
     steps:
       - name: Checkout builder repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Validate inputs
         shell: bash
@@ -118,7 +118,7 @@ jobs:
           git -C "$SOURCE_DIR" log -1 --oneline
 
       - name: Restore download cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: openwrt/dl
           key: fanchmwrt-dl-${{ runner.os }}-${{ inputs.source_ref }}-${{ hashFiles('custom/feeds.conf.default', 'custom/feeds.conf.append', 'custom/packages/**', 'custom/patches/**') }}
@@ -227,7 +227,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ steps.collect.outputs.firmware_name }}
           path: |

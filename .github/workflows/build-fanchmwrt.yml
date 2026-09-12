@@ -183,40 +183,57 @@ jobs:
           make -j"$(nproc)" || make -j1 V=s
 
       - name: Collect firmware and build information
+        id: collect
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$OUTPUT_DIR/firmware" "$OUTPUT_DIR/build-info"
-          rsync -a --prune-empty-dirs \
-            --include='*/' \
-            --include='*.bin' --include='*.img' --include='*.img.gz' \
-            --include='*.iso' --include='*.itb' --include='*.manifest' \
-            --include='*.json' --include='sha256sums' \
-            --exclude='*' \
-            "$SOURCE_DIR/bin/targets/" "$OUTPUT_DIR/firmware/"
+          mkdir -p "$OUTPUT_DIR/build-info"
+
+          mapfile -d '' firmware_candidates < <(
+            find "$SOURCE_DIR/bin/targets" -type f \
+              -name '*squashfs-combined-efi.img.gz' -print0
+          )
+          if (( ${#firmware_candidates[@]} != 1 )); then
+            echo "Expected exactly one squashfs combined EFI image, found ${#firmware_candidates[@]}." >&2
+            printf '  %s\n' "${firmware_candidates[@]}" >&2
+            exit 1
+          fi
+
+          build_date="$(date +'%y%m%d')"
+          firmware_name="${BUILD_NAME}-squashfs-combined-efi-${build_date}.img.gz"
+          firmware_path="$OUTPUT_DIR/$firmware_name"
+          cp "${firmware_candidates[0]}" "$firmware_path"
+          sha256sum "$firmware_path" > "$firmware_path.sha256"
+
           cp -a "$GITHUB_WORKSPACE/build-info/." "$OUTPUT_DIR/build-info/"
           git -C "$SOURCE_DIR" rev-parse HEAD > "$OUTPUT_DIR/build-info/source-commit.txt"
           printf '%s\n' "$SOURCE_REF" > "$OUTPUT_DIR/build-info/source-ref.txt"
           printf '%s\n' "$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
             > "$OUTPUT_DIR/build-info/workflow-run.txt"
 
-          if ! find "$OUTPUT_DIR/firmware" -type f -print -quit | grep -q .; then
-            echo "Build completed but no firmware files were found under bin/targets." >&2
-            exit 1
-          fi
+          {
+            echo "firmware_name=$firmware_name"
+            echo "firmware_path=$firmware_path"
+          } >> "$GITHUB_OUTPUT"
 
-          archive="$GITHUB_WORKSPACE/${BUILD_NAME}-${GITHUB_RUN_NUMBER}.tar.gz"
-          tar -C "$OUTPUT_DIR" -czf "$archive" .
-          sha256sum "$archive" > "$archive.sha256"
-          echo "ARCHIVE=$archive" >> "$GITHUB_ENV"
+          {
+            echo "## Firmware output"
+            echo
+            printf -- '- File: `%s`\n' "$firmware_name"
+            printf -- '- Source: `%s`\n' "$SOURCE_REF"
+            printf -- '- Artifact retention: 30 days\n'
+            printf -- '- SHA-256: `%s`\n' \
+              "$(sha256sum "$firmware_path" | cut -d' ' -f1)"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.build_name }}-${{ github.run_number }}
+          name: ${{ steps.collect.outputs.firmware_name }}
           path: |
-            ${{ env.ARCHIVE }}
-            ${{ env.ARCHIVE }}.sha256
+            ${{ steps.collect.outputs.firmware_path }}
+            ${{ steps.collect.outputs.firmware_path }}.sha256
+            ${{ env.OUTPUT_DIR }}/build-info/
           if-no-files-found: error
           retention-days: 30
 
@@ -228,7 +245,8 @@ jobs:
         run: |
           set -euo pipefail
           tag="build-$(date +'%Y%m%d-%H%M')-${GITHUB_RUN_NUMBER}"
-          gh release create "$tag" "$ARCHIVE" "$ARCHIVE.sha256" \
+          firmware_path='${{ steps.collect.outputs.firmware_path }}'
+          gh release create "$tag" "$firmware_path" "$firmware_path.sha256" \
             --repo "$GITHUB_REPOSITORY" \
             --title "$BUILD_NAME $tag" \
             --notes "FanchmWrt source ref: $SOURCE_REF"

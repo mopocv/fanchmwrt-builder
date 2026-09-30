@@ -1,0 +1,8 @@
+git
+git-http
+ca-bundle
+ca-certificates
+curl
+openssh-client
+openssh-sftp-client
+bash

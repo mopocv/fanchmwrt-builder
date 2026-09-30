@@ -121,7 +121,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: openwrt/dl
-          key: fanchmwrt-dl-${{ runner.os }}-${{ inputs.source_ref }}-${{ hashFiles('custom/feeds.conf.default', 'custom/feeds.conf.append', 'custom/packages/**', 'custom/patches/**') }}
+          key: fanchmwrt-dl-${{ runner.os }}-${{ inputs.source_ref }}-${{ hashFiles('custom/feeds.conf.default', 'custom/feeds.conf.append', 'custom/required-packages.txt', 'custom/packages/**', 'custom/patches/**') }}
           restore-keys: |
             fanchmwrt-dl-${{ runner.os }}-${{ inputs.source_ref }}-
             fanchmwrt-dl-${{ runner.os }}-
@@ -153,11 +153,13 @@ jobs:
         run: |
           set -euo pipefail
           cp "$CONFIG_REAL" .config
+          bash "$GITHUB_WORKSPACE/scripts/required-packages.sh" inject .config "$GITHUB_WORKSPACE/custom/required-packages.txt"
           if [[ "$SET_ROOT_PASSWORD" == true ]]; then
             sed -i -E '/^(CONFIG_BUSYBOX_CUSTOM=|# CONFIG_BUSYBOX_CUSTOM is not set|CONFIG_BUSYBOX_CONFIG_CHPASSWD=|# CONFIG_BUSYBOX_CONFIG_CHPASSWD is not set)/d' .config
             printf '\nCONFIG_BUSYBOX_CUSTOM=y\nCONFIG_BUSYBOX_CONFIG_CHPASSWD=y\n' >> .config
           fi
           make defconfig
+          bash "$GITHUB_WORKSPACE/scripts/required-packages.sh" verify .config "$GITHUB_WORKSPACE/custom/required-packages.txt"
           mkdir -p "$GITHUB_WORKSPACE/build-info"
           cp .config "$GITHUB_WORKSPACE/build-info/final.config"
           ./scripts/diffconfig.sh > "$GITHUB_WORKSPACE/build-info/diffconfig.txt"

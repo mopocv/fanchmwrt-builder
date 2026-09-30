@@ -18,9 +18,12 @@
 | `configs/` | 目标设备和软件包配置 |
 | `custom/feeds.conf.default` | 基础 feeds 及固定提交 |
 | `custom/feeds.conf.append` | 追加第三方 feeds |
+| `custom/required-packages.txt` | 每次构建默认启用的软件包清单 |
 | `custom/packages/` | 自定义软件包源码 |
 | `custom/files/` | 固件文件覆盖 |
 | `custom/patches/` | 源码补丁 |
 | `scripts/` | 应用定制配置与生成首次启动设置 |
 
 添加软件包来源后，在编译配置中启用对应的 `CONFIG_PACKAGE_包名=y`。密码和私有地址使用 Secrets，不写入仓库。
+
+默认包清单包含 `git`、`git-http`、`ca-bundle`、`ca-certificates`、`curl`、`openssh-client`、`openssh-sftp-client` 和 `bash`。要增删默认包，直接编辑 `custom/required-packages.txt`，每行一个包名；构建会在 `make defconfig` 后检查这些包是否启用，缺失时在编译前失败。

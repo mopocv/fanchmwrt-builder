@@ -8,7 +8,7 @@ set -eu
 if [ ! -s /etc/config/wireless ]; then
     /sbin/wifi config >/dev/null 2>&1 || true
 fi
-[ -s /etc/config/wireless ] || exit 0
+[ -s /etc/config/wireless ] || exit 1
 
 hostname="$(uci -q get system.@system[0].hostname 2>/dev/null || true)"
 [ -n "$hostname" ] || hostname='Fanchmwrt'
@@ -20,6 +20,16 @@ wifi_password_file=/etc/fanchmwrt-builder/wifi-password
 wifi_password="$(cat "$wifi_password_file")"
 
 for radio in $(uci -q show wireless | sed -n 's/^wireless\.\([^.=]*\)=wifi-device$/\1/p'); do
+    # The R86S N305 AX201 exposes one AP and needs legacy HT settings for AP mode.
+    radio_path="$(uci -q get "wireless.${radio}.path" 2>/dev/null || true)"
+    sysfs_device="/sys/devices/${radio_path}"
+    if [ -r "$sysfs_device/vendor" ] && [ -r "$sysfs_device/device" ] &&
+       [ "$(cat "$sysfs_device/vendor")" = '0x8086' ] &&
+       [ "$(cat "$sysfs_device/device")" = '0x54f0' ]; then
+        uci set "wireless.${radio}.band=2g"
+        uci set "wireless.${radio}.channel=1"
+        uci set "wireless.${radio}.htmode=HT20"
+    fi
     band="$(uci -q get "wireless.${radio}.band" 2>/dev/null || true)"
     case "$band" in
         2g)

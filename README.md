@@ -26,4 +26,8 @@
 
 添加软件包来源后，在编译配置中启用对应的 `CONFIG_PACKAGE_包名=y`。密码和私有地址使用 Secrets，不写入仓库。
 
-默认包清单包含 `git`、`git-http`、`ca-bundle`、`ca-certificates`、`curl`、`openssh-client`、`openssh-sftp-client` 和 `bash`。要增删默认包，直接编辑 `custom/required-packages.txt`，每行一个包名；构建会在 `make defconfig` 后检查这些包是否启用，缺失时在编译前失败。
+默认包清单包含 Git、SSH 和基础命令工具，并启用 `fanchmwrt-packages` 提交 `75c3c55e1d3d26ac0fbaf391c394b57c7b04285e` 中的全部 17 个应用包、16 个中文语言包，包括作者的独立无线设置、流量统计和新版特征库页面。普通模式的网络设置额外提供标准防火墙管理入口。
+
+无线默认配置使用主机名作为 SSID，密码从 `FANCHMWRT_WIFI_PASSWORD` Secret 注入。R86S N305 的 Intel 无线驱动同时启用 AX201 和 AX101 固件包，以覆盖设备实际请求的固件文件；该网卡默认使用 2.4 GHz、HT20，一个网卡仅提供一个 AP。
+
+要增删默认包，直接编辑 `custom/required-packages.txt`，每行一个包名；构建会在 `make defconfig` 后检查这些包是否启用，缺失时在编译前失败。

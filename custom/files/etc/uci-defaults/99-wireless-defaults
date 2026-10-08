@@ -1,0 +1,49 @@
+#!/bin/sh
+# Set default 2.4 GHz and 5 GHz access points when matching radios are present.
+set -eu
+
+[ -x /sbin/wifi ] || exit 0
+
+# x86 images may not have generated /etc/config/wireless yet.
+if [ ! -s /etc/config/wireless ]; then
+    /sbin/wifi config >/dev/null 2>&1 || true
+fi
+[ -s /etc/config/wireless ] || exit 0
+
+hostname="$(uci -q get system.@system[0].hostname 2>/dev/null || true)"
+[ -n "$hostname" ] || hostname='Fanchmwrt'
+wifi_password_file=/etc/fanchmwrt-builder/wifi-password
+[ -s "$wifi_password_file" ] || {
+    echo 'Wireless password file is missing; configure FANCHMWRT_WIFI_PASSWORD in GitHub Actions secrets.' >&2
+    exit 1
+}
+wifi_password="$(cat "$wifi_password_file")"
+
+for radio in $(uci -q show wireless | sed -n 's/^wireless\.\([^.=]*\)=wifi-device$/\1/p'); do
+    band="$(uci -q get "wireless.${radio}.band" 2>/dev/null || true)"
+    case "$band" in
+        2g)
+            ssid="$hostname"
+            ;;
+        5g)
+            ssid="${hostname}_5G"
+            ;;
+        *)
+            continue
+            ;;
+    esac
+
+    iface="default_${radio}"
+    uci set "wireless.${radio}.disabled=0"
+    uci set "wireless.${iface}=wifi-iface"
+    uci set "wireless.${iface}.device=${radio}"
+    uci set "wireless.${iface}.mode=ap"
+    uci set "wireless.${iface}.network=lan"
+    uci set "wireless.${iface}.ssid=${ssid}"
+    uci set "wireless.${iface}.encryption=psk2"
+    uci set "wireless.${iface}.key=${wifi_password}"
+done
+
+uci commit wireless
+rm -f "$wifi_password_file"
+exit 0

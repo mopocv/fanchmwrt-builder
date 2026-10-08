@@ -131,6 +131,7 @@ jobs:
           CUSTOM_LAN_IP: ${{ secrets.FANCHMWRT_LAN_IP }}
           CUSTOM_ROOT_PASSWORD: ${{ secrets.FANCHMWRT_ROOT_PASSWORD }}
           CUSTOM_ROOT_PASSWORD_HASH: ${{ secrets.FANCHMWRT_ROOT_PASSWORD_HASH }}
+          CUSTOM_WIFI_PASSWORD: ${{ secrets.FANCHMWRT_WIFI_PASSWORD }}
         shell: bash
         run: |
           set -euo pipefail

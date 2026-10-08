@@ -33,6 +33,22 @@ if [[ "${GITHUB_ACTIONS:-}" == true && -n "${CUSTOM_ROOT_PASSWORD_HASH:-}" ]]; t
   printf '::add-mask::%s\n' "$CUSTOM_ROOT_PASSWORD_HASH"
 fi
 
+if [[ -z "${CUSTOM_WIFI_PASSWORD:-}" ]]; then
+  echo 'FANCHMWRT_WIFI_PASSWORD GitHub Actions secret is required' >&2
+  exit 1
+fi
+python3 - <<'WIFI_CHECK'
+import os, re
+password = os.environ['CUSTOM_WIFI_PASSWORD']
+if '\n' in password or '\r' in password:
+    raise SystemExit('FANCHMWRT_WIFI_PASSWORD must not contain line breaks')
+if not (8 <= len(password.encode()) <= 63 or re.fullmatch(r'[0-9A-Fa-f]{64}', password)):
+    raise SystemExit('FANCHMWRT_WIFI_PASSWORD must be 8-63 characters or 64 hexadecimal digits')
+WIFI_CHECK
+if [[ "${GITHUB_ACTIONS:-}" == true ]]; then
+  printf '::add-mask::%s\n' "$CUSTOM_WIFI_PASSWORD"
+fi
+
 # Validate without printing secret values.
 python3 - <<'CHECK'
 import ipaddress, os, re
@@ -48,6 +64,11 @@ if h and not re.fullmatch(r'\$6\$(?:rounds=[0-9]+\$)?[./A-Za-z0-9]{1,16}\$[./A-Z
 CHECK
 
 mkdir -p "$uci_defaults_dir"
+wifi_password_file="$source_dir/files/etc/fanchmwrt-builder/wifi-password"
+mkdir -p "$(dirname "$wifi_password_file")"
+printf '%s' "$CUSTOM_WIFI_PASSWORD" > "$wifi_password_file"
+chmod 0600 "$wifi_password_file"
+unset CUSTOM_WIFI_PASSWORD
 
 quote_for_shell() {
   printf "%s" "$1" | sed "s/'/'\\\\''/g"

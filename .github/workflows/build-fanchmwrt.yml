@@ -3,6 +3,19 @@ name: Build FanchmWrt
 on:
   workflow_dispatch:
     inputs:
+      source_url:
+        description: "Source repository (select custom to use custom_source_url)"
+        required: true
+        default: "https://github.com/fanchmwrt/fanchmwrt.git"
+        type: choice
+        options:
+          - https://github.com/fanchmwrt/fanchmwrt.git
+          - https://github.com/mopocv/fanchmwrt.git
+          - custom
+      custom_source_url:
+        description: "Custom HTTPS Git repository URL (only used when source_url is custom)"
+        required: false
+        type: string
       source_ref:
         description: "FanchmWrt branch or tag"
         required: true
@@ -41,7 +54,8 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 360
     env:
-      SOURCE_URL: https://github.com/fanchmwrt/fanchmwrt.git
+      SOURCE_SELECTION: ${{ inputs.source_url }}
+      CUSTOM_SOURCE_URL: ${{ inputs.custom_source_url }}
       SOURCE_DIR: ${{ github.workspace }}/openwrt
       OUTPUT_DIR: ${{ github.workspace }}/output
       CONFIG_PATH: ${{ inputs.config_path }}
@@ -60,6 +74,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          case "$SOURCE_SELECTION" in
+            (https://github.com/fanchmwrt/fanchmwrt.git|https://github.com/mopocv/fanchmwrt.git)
+              source_url="$SOURCE_SELECTION"
+              ;;
+            (custom)
+              source_url="$CUSTOM_SOURCE_URL"
+              ;;
+            (*)
+              echo "Unsupported source repository selection: $SOURCE_SELECTION" >&2
+              exit 1
+              ;;
+          esac
+          if [[ ! "$source_url" =~ ^https://[^[:space:]]+$ ]]; then
+            echo "Source repository must be a non-empty HTTPS URL without whitespace." >&2
+            exit 1
+          fi
+          echo "SOURCE_URL=$source_url" >> "$GITHUB_ENV"
+
           case "$BUILD_NAME" in
             (*[!A-Za-z0-9._-]*|'')
               echo "build_name contains unsupported characters: $BUILD_NAME" >&2
@@ -210,6 +242,7 @@ jobs:
 
           cp -a "$GITHUB_WORKSPACE/build-info/." "$OUTPUT_DIR/build-info/"
           git -C "$SOURCE_DIR" rev-parse HEAD > "$OUTPUT_DIR/build-info/source-commit.txt"
+          printf '%s\n' "$SOURCE_URL" > "$OUTPUT_DIR/build-info/source-url.txt"
           printf '%s\n' "$SOURCE_REF" > "$OUTPUT_DIR/build-info/source-ref.txt"
           printf '%s\n' "$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
             > "$OUTPUT_DIR/build-info/workflow-run.txt"
@@ -223,7 +256,8 @@ jobs:
             echo "## Firmware output"
             echo
             printf -- '- File: `%s`\n' "$firmware_name"
-            printf -- '- Source: `%s`\n' "$SOURCE_REF"
+            printf -- '- Source repository: `%s`\n' "$SOURCE_URL"
+            printf -- '- Source ref: `%s`\n' "$SOURCE_REF"
             printf -- '- Artifact retention: 30 days\n'
             printf -- '- SHA-256: `%s`\n' \
               "$(sha256sum "$firmware_path" | cut -d' ' -f1)"
@@ -252,4 +286,4 @@ jobs:
           gh release create "$tag" "$firmware_path" "$firmware_path.sha256" \
             --repo "$GITHUB_REPOSITORY" \
             --title "$BUILD_NAME $tag" \
-            --notes "FanchmWrt source ref: $SOURCE_REF"
+            --notes "FanchmWrt source: $SOURCE_URL (ref: $SOURCE_REF)"

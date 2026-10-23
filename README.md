@@ -6,7 +6,7 @@
 
 1. 按需设置 [GitHub Actions Secrets](docs/secrets.md)。
 2. 打开 **Actions → Build FanchmWrt → Run workflow**。
-3. 选择源码分支和编译配置，默认使用 `fanchmwrt-25.12.4` 与 `configs/x86_64.config`。
+3. 选择源码分支和编译配置，默认使用 `fanchmwrt-25.12.6` 与 `configs/x86_64.config`。
 4. 构建完成后下载 Artifacts；开启 `publish_release` 可发布到 Releases。
 
 `build_name` 设置下载包名称，`hostname` 设置系统主机名。固件版本号跟随源码，避免影响软件中心的版本识别。

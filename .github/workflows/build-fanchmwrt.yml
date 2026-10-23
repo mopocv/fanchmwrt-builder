@@ -19,7 +19,7 @@ on:
       source_ref:
         description: "FanchmWrt branch or tag"
         required: true
-        default: "fanchmwrt-25.12.4"
+        default: "fanchmwrt-25.12.6"
         type: string
       config_path:
         description: "Config path in this repository"
